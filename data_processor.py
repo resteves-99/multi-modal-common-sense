@@ -65,7 +65,7 @@ class BatchProcessor():
         return True
 
     def forward(self):
-        idxs = np.random.random_integers(low=0, high=self.num_rows-1, size=self.batch_size)
+        idxs = np.random.choice(self.num_rows, size=self.batch_size, replace=False)
         database_batch = self.database.iloc[idxs]
         curr_batch = database_batch.loc[:, f"{self.attributes}-maj"]
         curr_batch = torch.tensor(curr_batch.values)
