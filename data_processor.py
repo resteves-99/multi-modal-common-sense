@@ -5,19 +5,19 @@ import torch
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 class BatchProcessor():
-    def __init__(self, dataset_size, split="train", attributes="weight", batch_size=20, epochs=1):
+    def __init__(self, args):
         # validate inputs and store them
-        if not self.check_valid_params(attributes, dataset_size, split):
+        if not self.check_valid_params(args.attributes, args.dataset_size, args.split):
             raise Exception("invalid batch processor inputs")
-        self.batch_size = batch_size
-        self.attributes = attributes
-        self.epochs = epochs
+        self.batch_size = args.batch_size
+        self.attributes = args.attributes
+        self.epochs = 0
         self.curr_idx = 0
         verbs = {"size": "bigger", "weight": "heavier", "strength": "stronger", "rigidness": "more rigid", "speed": "faster"}
-        self.verbs = verbs[attributes]
+        self.verbs = verbs[args.attributes]
 
         # initialize database
-        file = f"data/verbphysics/objects/train-{dataset_size}/{split}.csv"
+        file = f"data/verbphysics/objects/train-{args.dataset_size}/{args.split}.csv"
         database = pd.read_csv(file)
         self.database = self.preprocess(database)
         self.num_rows = self.database.shape[0]
@@ -64,10 +64,15 @@ class BatchProcessor():
         return True
 
     def forward(self):
-        idxs = range(self.curr_idx, self.curr_idx+self.batch_size)
-        self.curr_idx = self.curr_idx+self.batch_size
-        if self.curr_idx >= self.num_rows:
-            self.curr_idx = 0
+        if self.batch_size == 0:
+            idxs = range(0, self.num_rows)
+        else:
+            idxs = range(self.curr_idx, self.curr_idx+self.batch_size)
+            self.curr_idx = self.curr_idx+self.batch_size
+            if self.curr_idx >= self.num_rows:
+                self.curr_idx = 0
+                self.epochs += 1
+
         database_batch = self.database.iloc[idxs]
         curr_batch = database_batch.loc[:, f"{self.attributes}-maj"]
         curr_batch = torch.tensor(curr_batch.values)
@@ -79,8 +84,8 @@ class BatchProcessor():
             curr_statement = "A " + str(row["obj1"]) + f" is {self.verbs} than a " + str(row["obj2"])
             statements.append(curr_statement)
 
-        return curr_batch, agreement, statements
+        return curr_batch, agreement, statements, self.epochs
 
 if __name__ == '__main__':
     prc = BatchProcessor(dataset_size=5)
-    data, agreement, statements = prc.forward()
+    data, agreement, statements, curr_epochs = prc.forward()
