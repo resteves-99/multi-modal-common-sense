@@ -36,6 +36,8 @@ class BatchProcessor():
 
         # remove unlabelled data
         database = database[database[f"{self.attributes}-maj"] != -42]
+        database = database[database[f"{self.attributes}-maj"] != 0]
+        database = database[database[f"{self.attributes}-agree"] != 1]
         # for curr_attr in self.attributes:
         #     database = database[database[f"{curr_attr}-maj"] != -42]
         database = database.reset_index()
@@ -82,4 +84,3 @@ class BatchProcessor():
 if __name__ == '__main__':
     prc = BatchProcessor(dataset_size=5)
     data, agreement, statements = prc.forward()
-    print(statements)
