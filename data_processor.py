@@ -5,12 +5,14 @@ import torch
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 class BatchProcessor():
-    def __init__(self, model, dataset_size, split="train", attributes="weight", batch_size=20):
+    def __init__(self, dataset_size, split="train", attributes="weight", batch_size=20, epochs=1):
         # validate inputs and store them
-        if not self.check_valid_params(model, attributes, dataset_size, split):
+        if not self.check_valid_params(attributes, dataset_size, split):
             raise Exception("invalid batch processor inputs")
         self.batch_size = batch_size
         self.attributes = attributes
+        self.epochs = epochs
+        self.curr_idx = 0
         verbs = {"size": "bigger", "weight": "heavier", "strength": "stronger", "rigidness": "more rigid", "speed": "faster"}
         self.verbs = verbs[attributes]
 
@@ -40,12 +42,7 @@ class BatchProcessor():
 
         return database
 
-    def check_valid_params(self, model, attributes, dataset_size, split):
-        valid_models = ["roberta", "clip"]
-        if model not in valid_models:
-            print(f"The available models are {valid_models}")
-            return False
-
+    def check_valid_params(self, attributes, dataset_size, split):
         valid_attributes = ["size", "weight", "strength", "rigidness", "speed"]
         # if not all(elem in valid_attributes  for elem in attributes):
         if attributes not in valid_attributes:
@@ -65,7 +62,10 @@ class BatchProcessor():
         return True
 
     def forward(self):
-        idxs = np.random.choice(self.num_rows, size=self.batch_size, replace=False)
+        idxs = range(self.curr_idx, self.curr_idx+self.batch_size)
+        self.curr_idx = self.curr_idx+self.batch_size
+        if self.curr_idx >= self.num_rows:
+            self.curr_idx = 0
         database_batch = self.database.iloc[idxs]
         curr_batch = database_batch.loc[:, f"{self.attributes}-maj"]
         curr_batch = torch.tensor(curr_batch.values)
@@ -80,7 +80,6 @@ class BatchProcessor():
         return curr_batch, agreement, statements
 
 if __name__ == '__main__':
-    prc = BatchProcessor(model="roberta", dataset_size=5)
+    prc = BatchProcessor(dataset_size=5)
     data, agreement, statements = prc.forward()
-
     print(statements)
