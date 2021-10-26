@@ -78,6 +78,7 @@ class BatchProcessor():
         curr_batch = torch.tensor(curr_batch.values)
 
         agreement = database_batch.loc[:, f"{self.attributes}-agree"]
+        agreement = torch.tensor(agreement.values)
 
         statements = []
         for _, row in database_batch.iterrows():
