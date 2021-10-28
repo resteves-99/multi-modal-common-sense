@@ -5,19 +5,17 @@ import torch
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 class BatchProcessor():
-    def __init__(self, args):
+    def __init__(self, attributes="weight", dataset_size=20, split="train", batch_size=0):
         # validate inputs and store them
-        if not self.check_valid_params(args.attributes, args.dataset_size, args.split):
-            raise Exception("invalid batch processor inputs")
-        self.batch_size = args.batch_size
-        self.attributes = args.attributes
+        self.batch_size = batch_size
+        self.attributes = attributes
         self.epochs = 0
         self.curr_idx = 0
         verbs = {"size": "bigger", "weight": "heavier", "strength": "stronger", "rigidness": "more rigid", "speed": "faster"}
-        self.verbs = verbs[args.attributes]
+        self.verbs = verbs[attributes]
 
         # initialize database
-        file = f"data/verbphysics/objects/train-{args.dataset_size}/{args.split}.csv"
+        file = f"data/verbphysics/objects/train-{dataset_size}/{split}.csv"
         database = pd.read_csv(file)
         self.database = self.preprocess(database)
         self.num_rows = self.database.shape[0]
