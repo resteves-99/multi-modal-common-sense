@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from transformers import CLIPTokenizer, CLIPTextModel, RobertaTokenizer, RobertaModel, VisualBertModel, BertTokenizer
+from transformers import CLIPTokenizer, RobertaTokenizer, BertTokenizer, LxmertTokenizer, XLNetTokenizer
+from transformers import CLIPTextModel, RobertaModel, VisualBertModel, LxmertModel, XLNetModel
 
 
 from sklearn.metrics import classification_report
@@ -19,9 +20,18 @@ class WrappedModel:
         elif args.model == "roberta":
             self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
             self.model = RobertaModel.from_pretrained("roberta-base")
+        elif args.model == "roberta-small":
+            self.tokenizer = RobertaTokenizer.from_pretrained("klue/roberta-small")
+            self.model = RobertaModel.from_pretrained("klue/roberta-small")
         elif args.model == 'visualbert':
             self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
             self.model = VisualBertModel.from_pretrained('uclanlp/visualbert-vqa-coco-pre')
+        elif args.model.lower() == 'lxmert':
+            self.tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
+            self.model = LxmertModel.from_pretrained('unc-nlp/lxmert-base-uncased')
+        elif args.model.lower() == 'xlnet':
+            self.tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+            self.model = XLNetModel.from_pretrained('xlnet-base-cased')
         else:
             raise Exception("model not recognized")
 
