@@ -21,7 +21,7 @@ MODELS = {
     "roberta_small": "klue/roberta-small", 
     "visualbert": 'uclanlp/visualbert-vqa-coco-pre',  # dif tokenizer ??
     "lxmert": "unc-nlp/lxmert-base-uncased", 
-    "xlnet": "xlnet-base-cased", 
+    # "xlnet": "xlnet-base-cased", 
 }
 
 
@@ -34,6 +34,7 @@ class WrappedModel:
         elif model == 'clip':  # special case
             self.model = CLIPTextModel.from_pretrained(MODELS[model]) 
         elif model == 'lxmert':
+            """ TODO: input black image """
             # self.tokenizer = LxmertTokenizer.from_pretrained(MODELS[args.model])
             # self.model = LxmertModel.from_pretrained(MODELS[args.model])
             raise Exception("Not implemented yet")
@@ -102,8 +103,7 @@ class WrappedModel:
 
     def forward(self):
         self.train()
-        acc = self.test()
-        return acc
+        return self.test()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Flip some bits!')
