@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from transformers import CLIPTokenizer, RobertaTokenizer, BertTokenizer, LxmertTokenizer, XLNetTokenizer, AutoTokenizer
+from tqdm import tqdm
+from transformers import CLIPTokenizer, RobertaTokenizer, BertTokenizer, LxmertTokenizer, XLNetTokenizer, AutoTokenizer, T5Tokenizer
 from transformers import CLIPTextModel, RobertaModel, VisualBertModel, LxmertModel, XLNetModel, AutoModel
 
 
@@ -21,33 +22,34 @@ MODELS = {
     "roberta_small": "klue/roberta-small", 
     "visualbert": 'uclanlp/visualbert-vqa-coco-pre',  # dif tokenizer ??
     "lxmert": "unc-nlp/lxmert-base-uncased", 
-    # "xlnet": "xlnet-base-cased", 
+    "uniter": "visualjoyce/transformers4vl-uniter-base",
 }
 
 
 class WrappedModel:
-    def __init__(self, attributes="weight", model="clip", use_pooled=False, batch_size=0, split="train", dataset_size=20, verbose=False):
-        """TODO: explore initation strategies
-        can we call one function to load any model?"""
+    def __init__(self, attributes="weight", model="clip", use_pooled=False, batch_size=0, split="train", dataset_size=20, verbose=False, epochs=10):
         if model not in MODELS:
             raise Exception("Model not recognized.")
         elif model == 'clip':  # special case
             self.model = CLIPTextModel.from_pretrained(MODELS[model]) 
-        elif model == 'lxmert':
-            """ TODO: input black image """
-            # self.tokenizer = LxmertTokenizer.from_pretrained(MODELS[args.model])
-            # self.model = LxmertModel.from_pretrained(MODELS[args.model])
-            raise Exception("Not implemented yet")
         else:
             self.model = AutoModel.from_pretrained(MODELS[model])
+            if verbose:
+                print(self.model)
         
         if model == "visualbert":
             self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        elif model == "numbert":
+            self.tokenizer = T5Tokenizer.from_pretrained("t5-base")
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(MODELS[model])
-            
+        
+        assert(self.tokenizer is not None)
+        assert(self.model is not None)
+        
         self.classifier = LogisticRegression(random_state=0, max_iter=1000)
         
+        self.epochs = epochs
         self.verbose = verbose
         self.use_pooled = use_pooled
         self.batch_size = batch_size
@@ -59,23 +61,62 @@ class WrappedModel:
         self.test_loader = BatchProcessor(attributes, dataset_size, split, batch_size)
 
     def get_features(self, processor):
-        # print(f"getting features")
-        labels, _, statements, _ = processor.forward()  # not used: cur batch, epoch
-        inputs = self.tokenizer(statements, return_tensors="pt", padding=True, truncation=True)
-        outputs = self.model(**inputs)
-        
-        features = None
-        if self.use_pooled:
-            features = outputs.pooler_output
+        if self.model.base_model_prefix == 'lxmert':
+            features, labels, statements = self.get_lxmert_features(processor)
         else:
-            """ TODO: identify better fix for non-symetric tensors """
-            features = outputs.last_hidden_state[:, :9, :].reshape(len(statements), -1)
+            labels, _, statements, _ = processor.forward()  # not used: cur batch, epoch
+            inputs = self.tokenizer(statements, return_tensors="pt", padding=True, truncation=True)
+            outputs = self.model(**inputs)
+            features = None
+            if self.use_pooled:
+                features = outputs.pooler_output
+            else:
+                """ TODO: identify better fix for non-symetric tensors """
+                features = outputs.last_hidden_state[:, :9, :].reshape(len(statements), -1)
                     
         if len(statements) == self.batch_size:
             features = torch.cat(features).cpu().numpy()
             labels = torch.cat(labels).cpu().numpy()
         
         return features, labels, statements
+
+    def get_lxmert_features(self, processor):
+        """ gross special handler for passing in bogus image data """
+        all_features = []
+        all_labels = []
+        all_statements = []
+        
+        if self.batch_size == 0:
+            self.epochs = 1
+        
+        with torch.no_grad():
+            for epoch in self.epochs:
+                labels, _, statements, _ = processor.forward()  # not used: cur batch, epoch
+                num_ex = self.batch_size
+                if num_ex == 0:
+                    num_ex = len(statements)
+                    
+                if self.verbose:
+                    print(self.batch_size * len(all_labels))
+
+                if len(labels) == 0:
+                    return features
+
+                inputs = self.tokenizer(statements, return_tensors="pt", padding=True, truncation=True)
+                visual_feats = torch.rand(num_ex, 768, 2048)
+                bounding_boxes = torch.rand(num_ex, 768, 4)
+
+                outputs = self.model(**inputs, visual_feats=visual_feats, visual_pos=bounding_boxes)
+
+                if self.use_pooled:
+                    all_features += [outputs.pooled_output]
+                else:
+                    all_features += [outputs.language_output[:, :9, :].reshape(len(statements), -1)]
+
+                all_statements += statements
+                all_labels += [labels]
+
+            return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy(), all_statements
 
     def train(self):
         features, labels, _ = self.get_features(self.train_loader)
