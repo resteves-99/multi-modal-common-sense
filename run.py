@@ -5,10 +5,9 @@ from tqdm import tqdm
 from transformers import CLIPTokenizer, RobertaTokenizer, BertTokenizer, LxmertTokenizer, XLNetTokenizer, AutoTokenizer, T5Tokenizer
 from transformers import CLIPTextModel, RobertaModel, VisualBertModel, LxmertModel, XLNetModel, AutoModel
 
-
 from sklearn.metrics import classification_report
 from sklearn.linear_model import LogisticRegression
-from data_processor import BatchProcessor
+from data_processor import batch_processor
 
 import argparse
 import logging
@@ -27,7 +26,7 @@ MODELS = {
 
 
 class WrappedModel:
-    def __init__(self, attributes="weight", model="clip", use_pooled=False, batch_size=0, split="train", dataset_size=20, verbose=False, epochs=10):
+    def __init__(self, attributes="weight", model="clip", use_pooled=False, batch_size=0, split="train", dataset_size=20, verbose=False, epochs=10, dataset="vocab"):
         if model not in MODELS:
             raise Exception("Model not recognized.")
         elif model == 'clip':  # special case
@@ -42,32 +41,32 @@ class WrappedModel:
         elif model == "numbert":
             self.tokenizer = T5Tokenizer.from_pretrained("t5-base")
         else:
+            # if i am initializing the special tokens here will the transformer recognize them?
             self.tokenizer = AutoTokenizer.from_pretrained(MODELS[model])
         
         assert(self.tokenizer is not None)
         assert(self.model is not None)
         
         self.classifier = LogisticRegression(random_state=0, max_iter=1000)
-        
-        self.epochs = epochs
+
         self.verbose = verbose
         self.use_pooled = use_pooled
         self.batch_size = batch_size
         # self.max_epochs = args.epochs
-        self.train_loader = BatchProcessor(attributes, dataset_size, split, batch_size)
+        self.train_loader = batch_processor(dataset, attributes, dataset_size, split, batch_size, self.tokenizer)
         
         split = "test"
         self.batch_size = 0
-        self.test_loader = BatchProcessor(attributes, dataset_size, split, batch_size)
+        self.test_loader = batch_processor(dataset, attributes, dataset_size, split, batch_size, self.tokenizer)
 
     def get_features(self, processor):
         if self.model.base_model_prefix == 'lxmert':
             features, labels, statements = self.get_lxmert_features(processor)
         else:
             labels, _, statements, _ = processor.forward()  # not used: cur batch, epoch
+            print("FSDL:KAJSDF:LKJDS:LFKJSDf")
             inputs = self.tokenizer(statements, return_tensors="pt", padding=True, truncation=True)
             outputs = self.model(**inputs)
-            features = None
             if self.use_pooled:
                 features = outputs.pooler_output
             else:
@@ -85,22 +84,22 @@ class WrappedModel:
         all_features = []
         all_labels = []
         all_statements = []
-        
+
         if self.batch_size == 0:
             self.epochs = 1
-        
+
         with torch.no_grad():
             for epoch in self.epochs:
                 labels, _, statements, _ = processor.forward()  # not used: cur batch, epoch
                 num_ex = self.batch_size
                 if num_ex == 0:
                     num_ex = len(statements)
-                    
+
                 if self.verbose:
                     print(self.batch_size * len(all_labels))
 
                 if len(labels) == 0:
-                    return features
+                    return all_features
 
                 inputs = self.tokenizer(statements, return_tensors="pt", padding=True, truncation=True)
                 visual_feats = torch.rand(num_ex, 768, 2048)
@@ -160,8 +159,9 @@ if __name__ == '__main__':
                         help='')
     parser.add_argument('--use_pooled', type=bool, default=False,
                         help='Pool last hidden state?')
-    parser.add_argument('--model', type=str, default="clip",
+    parser.add_argument('--model', type=str, default="roberta",
                         help='')
+    parser.add_argument('--dataset', type=str, default="verb")
     
     args = parser.parse_args()
 
@@ -172,5 +172,6 @@ if __name__ == '__main__':
         batch_size=args.batch_size, 
         split=args.split,
         verbose=True,
+        dataset=args.dataset,
     )
     m.forward()

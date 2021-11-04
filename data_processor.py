@@ -1,11 +1,44 @@
 import numpy as np
 import pandas as pd
 import torch
+from datasets import load_dataset
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-class BatchProcessor():
-    def __init__(self, attributes="weight", dataset_size=20, split="train", batch_size=0):
+def batch_processor(dataset, attributes, dataset_size, split, batch_size, tokenizer=None):
+    if dataset == "verb":
+        return VerbProcessor(attributes, dataset_size, split, batch_size)
+    elif dataset == "prost":
+        return ProstProcessor(split, tokenizer, batch_size)
+
+class ProstProcessor():
+    def __init__(self, split, tokenizer, batch_size):
+        self.dataset = load_dataset('corypaik/prost', split='test')
+        self.dataset = self.dataset.train_test_split(test_size=0.1)[split]
+        if split == "train":
+            self.dataset = self.dataset.select(range(500))
+        self.idx = 0
+        self.tokenizer = tokenizer
+        self.batch_size = batch_size
+        print(len(self.dataset))
+
+    def forward(self):
+        label_to_char = {0: 'A', 1:'B', 2:'C', 3:'D'}
+        inputs = []
+        labels = []
+        for row in self.dataset:
+            # assumes bert special tokens
+            curr_input = row['question'] + " [SEP] " + row['context']
+            for idx in range(4):
+                curr_answer = row[label_to_char[row['label']]]
+                tmp_curr_input = curr_input.replace("[MASK]", curr_answer)
+                curr_label = idx == row['label']
+                inputs.append(tmp_curr_input)
+                labels.append(curr_label)
+        return labels, None, inputs, None
+
+class VerbProcessor():
+    def __init__(self, attributes, dataset_size, split, batch_size):
         # validate inputs and store them
         self.batch_size = batch_size
         self.attributes = attributes
@@ -86,5 +119,5 @@ class BatchProcessor():
         return curr_batch, agreement, statements, self.epochs
 
 if __name__ == '__main__':
-    prc = BatchProcessor(dataset_size=5)
+    prc = batch_processor(dataset="verb", attributes="weight", split='train', batch_size=0, dataset_size=5)
     data, agreement, statements, curr_epochs = prc.forward()
