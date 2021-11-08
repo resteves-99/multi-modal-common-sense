@@ -1,10 +1,17 @@
 import torch
 import numpy as np
+import logging
 from transformers import AutoTokenizer, AutoModel
 from transformers import CLIPTextModel, T5Tokenizer, BertTokenizer
 
+
+from sklearn.metrics import classification_report
+from sklearn.linear_model import LogisticRegression
+
 # local
 from models.uniter.vqa_model import VQAModel
+
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 
 MODELS = {
@@ -33,7 +40,7 @@ MODELS = {
         'tokenizer': AutoTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased"),
     },
     'uniter': {
-        'model': VQAModel(num_answers=10, model = 'uniter')
+        'model': VQAModel(num_answers=10, model = 'uniter'),
         'tokenizer': BertTokenizer.from_pretrained("bert-base-uncased"),
     }
 }
@@ -57,6 +64,8 @@ class WordModel:
         embeds = None
         if self.model.base_model_prefix == 'uniter':
             embeds = self.model.encoder.model.uniter.embeddings.word_embeddings
+        elif self.model.base_model_prefix == 'clip':
+            embeds = self.model.text_model.embeddings.token_embedding
         else:
             embeds = self.model.embeddings.word_embeddings
             
@@ -67,7 +76,7 @@ class WordModel:
     
     def get_features(self, input_sentences):
         inputs = self.tokenizer(input_sentences, return_tensors="pt", padding=True, truncation=True)
-        out = self.embedding(inputs['input_ids'])
+        out = self.embedding(inputs['input_ids']).reshape(len(input_sentences), -1)
         
         if self.verbose:
             print(f"Created features from {len(input_sentences)} examples with shape: {out.shape}")
@@ -78,22 +87,25 @@ class WordModel:
 def train_model(features, labels):
     print(f"Training on [{len(labels)}] samples")
     lr = LogisticRegression(random_state=0, max_iter=1000)
-    lr.fit(features, labels)
-    lr = _fit_model(features, labels)
+    with torch.no_grad():
+        lr.fit(features, labels)
+    
     return lr 
 
 
 def test_model(lr, test_features, test_labels, return_probs=False, verbose=False):
     print(f"Testing on [{len(test_labels)}] samples")
-    predictions = np.array(lr.predict(test_features))
-    labels = np.array(labels)
+    with torch.no_grad():
+        predictions = np.array(lr.predict(test_features))
+
+    labels = np.array(test_labels)
     
-    accuracy = (100. * len(labels[labels == predictions])) / len(raw)
+    accuracy = (100. * len(labels[labels == predictions])) / len(test_labels)
     if verbose:
         print(classification_report(test_labels, predictions))
     
     if return_probs:
-        probs = np.array(lr.predict_proba(features))
+        probs = np.array(lr.predict_proba(test_features))
         return accuracy, probs 
     else:
         return accuracy
