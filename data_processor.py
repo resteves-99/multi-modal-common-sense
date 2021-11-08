@@ -5,20 +5,39 @@ from datasets import load_dataset
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-def batch_processor(dataset, attributes, dataset_size, split, batch_size, tokenizer=None):
+def batch_processor(dataset, split, batch_size=0, attributes="weight", dataset_size=20):
     if dataset == "verb":
         return VerbProcessor(attributes, dataset_size, split, batch_size)
     elif dataset == "prost":
-        return ProstProcessor(split, tokenizer, batch_size)
+        return ProstProcessor(split, batch_size)
+    elif dataset == "doq":
+        return DoqProcessor(split)
+
+class DoqProcessor():
+    def __init__(self, split):
+        self.data = pd.read_csv(f"data/doq/noun/{split}.csv")
+        self.data = self.data.values #get into numpy array
+        self.verbs = {"big": "bigger", "heavy": "heavier", "fast": "faster"}
+
+
+    def forward(self):
+        labels = []
+        inputs = []
+        for row in self.data:
+            str = f"A {row[0]} is {self.verbs[row[2]]} than a {row[1]}?"
+            inputs.append(str)
+            labels.append(row[3])
+        labels = torch.tensor(labels)
+
+        return labels, None, inputs, None
 
 class ProstProcessor():
-    def __init__(self, split, tokenizer, batch_size):
+    def __init__(self, split, batch_size):
         self.dataset = load_dataset('corypaik/prost', split='test')
         self.dataset = self.dataset.train_test_split(test_size=0.1)[split]
         if split == "train":
             self.dataset = self.dataset.select(range(500))
         self.idx = 0
-        self.tokenizer = tokenizer
         self.batch_size = batch_size
         print(len(self.dataset))
 
@@ -67,7 +86,7 @@ class VerbProcessor():
 
         # remove unlabelled data
         database = database[database[f"{self.attributes}-maj"] != -42]
-        database = database[database[f"{self.attributes}-maj"] != 0]
+        # database = database[database[f"{self.attributes}-maj"] != 0] # ambigious questions
         database = database[database[f"{self.attributes}-agree"] != 1]
         # for curr_attr in self.attributes:
         #     database = database[database[f"{curr_attr}-maj"] != -42]
@@ -119,5 +138,5 @@ class VerbProcessor():
         return curr_batch, agreement, statements, self.epochs
 
 if __name__ == '__main__':
-    prc = batch_processor(dataset="verb", attributes="weight", split='train', batch_size=0, dataset_size=5)
-    data, agreement, statements, curr_epochs = prc.forward()
+    prc = batch_processor(dataset="doq", split='test', batch_size=0)
+    # data, agreement, statements, curr_epochs = prc.forward()
