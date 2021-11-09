@@ -40,8 +40,8 @@ MODELS = {
         'tokenizer': AutoTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased"),
     },
     'uniter': {
-        'model': VQAModel(num_answers=10, model = 'uniter'),
-        'tokenizer': BertTokenizer.from_pretrained("bert-base-uncased"),
+        'model': VQAModel(num_answers=2, model = 'uniter'),
+        'tokenizer': BertTokenizer.from_pretrained("bert-base-cased"),
     }
 }
 
@@ -54,10 +54,11 @@ class WordModel:
         
         self.tokenizer = MODELS[model]['tokenizer']
         self.model = MODELS[model]['model']
+        # print(self.model)
         self.embedding = self._set_word_embeddings()
         
         if self.verbose:
-            print(f"Model: {model.base_model_prefix} | Tokenizer: {self.tokenizer.name_or_path}")
+            print(f"Model: {self.model.base_model_prefix} | Tokenizer: {self.tokenizer.name_or_path}")
         
     def _set_word_embeddings(self):
         """ Return word embedding layer from model """
@@ -66,18 +67,28 @@ class WordModel:
             embeds = self.model.encoder.model.uniter.embeddings.word_embeddings
         elif self.model.base_model_prefix == 'clip':
             embeds = self.model.text_model.embeddings.token_embedding
+        elif self.model.base_model_prefix == 'transformer':
+            embeds = self.model.encoder.embed_tokens
         else:
             embeds = self.model.embeddings.word_embeddings
             
         if self.verbose:
-            print(f"Loaded embedding layer with shape: {embeds.shape}")
+            print(f"Loaded embedding layer: {embeds}")
         
         return embeds
     
-    def get_features(self, input_sentences):
-        inputs = self.tokenizer(input_sentences, return_tensors="pt", padding=True, truncation=True)
-        out = self.embedding(inputs['input_ids']).reshape(len(input_sentences), -1)
-        
+    def get_features(self, input_sentences, pooled=False):
+        inputs = self.tokenizer(input_sentences, return_tensors="pt", padding='max_length', truncation=True, max_length=20)
+        out = None
+        # if self.model.base_model_prefix == 'uniter':
+        #     """ Special handling for uniter, doesn't like some tokens """
+        #     pass
+        # else:
+        if pooled:
+            out = self.embedding(inputs['input_ids']).mean(axis=1)
+        else:
+            out = self.embedding(inputs['input_ids']).reshape(len(input_sentences), -1)
+                
         if self.verbose:
             print(f"Created features from {len(input_sentences)} examples with shape: {out.shape}")
         
@@ -85,8 +96,8 @@ class WordModel:
     
 
 def train_model(features, labels):
-    print(f"Training on [{len(labels)}] samples")
-    lr = LogisticRegression(random_state=0, max_iter=1000)
+    # print(f"Training on [{len(labels)}] samples")
+    lr = LogisticRegression(random_state=0, max_iter=2500)
     with torch.no_grad():
         lr.fit(features, labels)
     
@@ -94,7 +105,7 @@ def train_model(features, labels):
 
 
 def test_model(lr, test_features, test_labels, return_probs=False, verbose=False):
-    print(f"Testing on [{len(test_labels)}] samples")
+    # print(f"Testing on [{len(test_labels)}] samples")
     with torch.no_grad():
         predictions = np.array(lr.predict(test_features))
 
@@ -105,7 +116,8 @@ def test_model(lr, test_features, test_labels, return_probs=False, verbose=False
         print(classification_report(test_labels, predictions))
     
     if return_probs:
-        probs = np.array(lr.predict_proba(test_features))
+        with torch.no_grad():
+            probs = np.array(lr.predict_proba(test_features))
         return accuracy, probs 
     else:
         return accuracy
