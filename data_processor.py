@@ -24,7 +24,7 @@ class DoqProcessor():
         labels = []
         inputs = []
         for row in self.data:
-            str = f"A {row[0]} is {self.verbs[row[2]]} than a {row[1]}?"
+            str = f"A {row[0]} is {self.verbs[row[2]]} than a {row[1]}"
             inputs.append(str)
             labels.append(row[3])
         labels = torch.tensor(labels)
@@ -39,7 +39,6 @@ class ProstProcessor():
             self.dataset = self.dataset.select(range(500))
         self.idx = 0
         self.batch_size = batch_size
-        print(len(self.dataset))
 
     def forward(self):
         label_to_char = {0: 'A', 1:'B', 2:'C', 3:'D'}
@@ -49,7 +48,7 @@ class ProstProcessor():
             # assumes bert special tokens
             curr_input = row['question'] + " [SEP] " + row['context']
             for idx in range(4):
-                curr_answer = row[label_to_char[row['label']]]
+                curr_answer = row[label_to_char[idx]]
                 tmp_curr_input = curr_input.replace("[MASK]", curr_answer)
                 curr_label = idx == row['label']
                 inputs.append(tmp_curr_input)
