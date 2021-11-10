@@ -39,10 +39,20 @@ class ProstProcessor():
         #  'grasping' 'height' 'mass' 'rolling' 'sliding' 'stacking'
         self.dataset = load_dataset('corypaik/prost', split='test')
         self.dataset = self.dataset.train_test_split(test_size=0.1)[split]
+
+        if split == "train":
+            end_idx = int(len(self.dataset)/2)
+            self.dataset.select(range(end_idx))
+        else:
+            start_idx = int(len(self.dataset)/2)
+            end_idx = int(len(self.dataset))
+            self.dataset.select(range(start_idx, end_idx))
+
         if attribute is not "all":
             self.dataset = self.dataset.filter(lambda row: row["group"] == attribute)
         if split == "train":
             self.dataset = self.dataset.select(range(500))
+
         self.idx = 0
         self.batch_size = batch_size
 
