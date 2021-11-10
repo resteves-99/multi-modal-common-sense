@@ -33,7 +33,10 @@ class DoqProcessor():
         return labels, None, inputs, None
 
 class ProstProcessor():
-    def __init__(self, split, batch_size, attribute="stacking"):
+    def __init__(self, split, batch_size, attribute="bouncing"):
+        # attributes can be one of:
+        # 'bouncing' 'breaking' 'circumference' 'directions'
+        #  'grasping' 'height' 'mass' 'rolling' 'sliding' 'stacking'
         self.dataset = load_dataset('corypaik/prost', split='test')
         self.dataset = self.dataset.train_test_split(test_size=0.1)[split]
         if attribute is not "all":
