@@ -1,12 +1,14 @@
 import torch
 import numpy as np
 import logging
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModel, VisualBertModel
 from transformers import CLIPTextModel, T5Tokenizer, BertTokenizer
 
 
 from sklearn.metrics import classification_report
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
 
 # local
 from models.uniter.vqa_model import VQAModel
@@ -28,7 +30,7 @@ MODELS = {
         "tokenizer": AutoTokenizer.from_pretrained("klue/roberta-small"),
     },
     'visualbert': {
-        'model': AutoModel.from_pretrained('uclanlp/visualbert-vqa-coco-pre'),
+        'model': VisualBertModel.from_pretrained('uclanlp/visualbert-vqa-coco-pre'),
         'tokenizer': BertTokenizer.from_pretrained("bert-base-uncased"),
     },
     't5': {
@@ -46,10 +48,11 @@ MODELS = {
 }
 
 class WordModel:
-    def __init__(self, model, verbose=False):
+    def __init__(self, model, try_encoder=False, verbose=False):
         if model not in MODELS:
             raise Exception("Model not recognized.")
         
+        self.try_encoder = try_encoder
         self.verbose = verbose
         
         self.tokenizer = MODELS[model]['tokenizer']
@@ -80,14 +83,17 @@ class WordModel:
     def get_features(self, input_sentences, pooled=False):
         inputs = self.tokenizer(input_sentences, return_tensors="pt", padding='max_length', truncation=True, max_length=20)
         out = None
-        # if self.model.base_model_prefix == 'uniter':
-        #     """ Special handling for uniter, doesn't like some tokens """
-        #     pass
-        # else:
-        if pooled:
-            out = self.embedding(inputs['input_ids']).mean(axis=1)
+        if self.try_encoder:
+            if self.model.base_model_prefix in ['roberta', 'roberta_small', 'visualbert', 'visual_bert', 'uniter', 'clip']:
+                encoded = self.model(**inputs)
+                out = encoded.last_hidden_state.reshape(len(input_sentences), -1)
+            else:
+                raise Exception("Model doesn't have native encoder support, use embeddings")
         else:
-            out = self.embedding(inputs['input_ids']).reshape(len(input_sentences), -1)
+            if pooled:
+                out = self.embedding(inputs['input_ids']).mean(axis=1)
+            else:
+                out = self.embedding(inputs['input_ids']).reshape(len(input_sentences), -1)
                 
         if self.verbose:
             print(f"Created features from {len(input_sentences)} examples with shape: {out.shape}")
@@ -97,7 +103,9 @@ class WordModel:
 
 def train_model(features, labels):
     # print(f"Training on [{len(labels)}] samples")
-    lr = LogisticRegression(random_state=0, max_iter=2500)
+    # lr = LogisticRegression(random_state=0, max_iter=1000)
+    lr = make_pipeline(StandardScaler(), SGDClassifier(random_state=0, max_iter=1000, loss="log", n_jobs=-1))
+    
     with torch.no_grad():
         lr.fit(features, labels)
     
@@ -123,9 +131,9 @@ def test_model(lr, test_features, test_labels, return_probs=False, verbose=False
         return accuracy
 
 
-def run_model(model_name, labels, sentences, test_labels, test_sentences, verbose=False):
+def run_model(model_name, labels, sentences, test_labels, test_sentences, verbose=False, try_encoder=False):
     # instantiate
-    m = WordModel(model_name, verbose)
+    m = WordModel(model_name, verbose=verbose, try_encoder=try_encoder)
     
     # train
     train_features = m.get_features(sentences)
