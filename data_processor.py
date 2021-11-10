@@ -9,7 +9,8 @@ def batch_processor(dataset, split, batch_size=0, attributes="weight", dataset_s
     if dataset == "verb":
         return VerbProcessor(attributes, dataset_size, split, batch_size)
     elif dataset == "prost":
-        return ProstProcessor(split, batch_size)
+        print(attributes)
+        return ProstProcessor(split, batch_size, )
     elif dataset == "doq":
         return DoqProcessor(split)
 
@@ -32,9 +33,11 @@ class DoqProcessor():
         return labels, None, inputs, None
 
 class ProstProcessor():
-    def __init__(self, split, batch_size):
+    def __init__(self, split, batch_size, attribute="stacking"):
         self.dataset = load_dataset('corypaik/prost', split='test')
         self.dataset = self.dataset.train_test_split(test_size=0.1)[split]
+        if attribute is not "all":
+            self.dataset = self.dataset.filter(lambda row: row["group"] == attribute)
         if split == "train":
             self.dataset = self.dataset.select(range(500))
         self.idx = 0
