@@ -15,12 +15,17 @@ def run(args):
     print(f"The model achieved {accuracy}% accuracy")
 
     curr_directory = os.path.dirname(__file__)
-    curr_directory = os.path.join(curr_directory, f"log/{args.model}/{args.dataset}/{args.attributes}")
-    if not os.path.isdir(curr_directory):
-        os.mkdir(curr_directory)
+    print("daslkfasd", curr_directory)
+    extensions = ["./log", f"/{args.model}", f"/{args.dataset}", f"/{args.attributes}"]
+    for curr_dir in extensions:
+        curr_directory = curr_directory + curr_dir
+        print('a', curr_directory, os.path.isdir(curr_directory))
+        if not os.path.isdir(curr_directory):
+            print('b')
+            os.mkdir(curr_directory)
     file = open(curr_directory + "/log.txt", "w")
-    file.write(f"The model achieved {accuracy}% accuracy")
-    file.write(f"{curr_idx}\n" for curr_idx in error_idxs)
+    file.write(f"The model achieved {accuracy}% accuracy\n")
+    file.write(str(error_idxs))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('Flip some bits!')
