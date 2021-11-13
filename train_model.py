@@ -123,7 +123,10 @@ def test_model(lr, test_features, test_labels, return_probs=False, verbose=False
     if verbose:
         print(classification_report(test_labels, predictions))
 
-    errors = labels == predictions
+    errors = []
+    for idx in range(len(labels)):
+        if labels[idx] != predictions[idx]:
+            errors.append(idx)
     if return_probs:
         with torch.no_grad():
             probs = np.array(lr.predict_proba(test_features))
