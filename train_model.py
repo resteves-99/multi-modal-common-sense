@@ -128,13 +128,14 @@ def test_model(lr, test_features, test_labels, return_probs=False, verbose=False
     accuracy = (100. * len(labels[labels == predictions])) / len(test_labels)
     if verbose:
         print(classification_report(test_labels, predictions))
-    
+
+    errors = labels == predictions
     if return_probs:
         with torch.no_grad():
             probs = np.array(lr.predict_proba(test_features))
-        return accuracy, probs 
+        return accuracy, probs, errors
     else:
-        return accuracy
+        return accuracy, errors
 
 
 def run_model(model_name, labels, sentences, test_labels, test_sentences, verbose=False, try_encoder=False):
