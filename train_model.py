@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import logging
+from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel, VisualBertModel
 from transformers import CLIPTextModel, T5Tokenizer, BertTokenizer
 
@@ -81,22 +82,27 @@ class WordModel:
         return embeds
     
     def get_features(self, input_sentences, pooled=False):
-        inputs = self.tokenizer(input_sentences, return_tensors="pt", padding='max_length', truncation=True, max_length=20)
-        out = None
-        if self.try_encoder:
-            if self.model.base_model_prefix in ['roberta', 'roberta_small', 'visualbert', 'visual_bert', 'uniter', 'clip']:
-                encoded = self.model(**inputs)
-                out = encoded.last_hidden_state.reshape(len(input_sentences), -1)
+        all_features = []
+        for i in tqdm(range(int(len(input_sentences) / 20))):
+            batch = input_sentences[i*20:(i+1)*20]
+            inputs = self.tokenizer(batch, return_tensors="pt", padding='max_length', truncation=True, max_length=20)
+            if self.try_encoder:
+                if self.model.base_model_prefix in ['roberta', 'roberta_small', 'visualbert', 'visual_bert', 'uniter', 'clip']:
+                    encoded = self.model(**inputs)
+                    all_features += [encoded.last_hidden_state.reshape(len(batch), -1)]
+                else:
+                    raise Exception("Model doesn't have native encoder support, use embeddings")
             else:
-                raise Exception("Model doesn't have native encoder support, use embeddings")
-        else:
-            if pooled:
-                out = self.embedding(inputs['input_ids']).mean(axis=1)
-            else:
-                out = self.embedding(inputs['input_ids']).reshape(len(input_sentences), -1)
+                if pooled:
+                    all_features += self.embedding(inputs['input_ids']).mean(axis=1)
+                else:
+                    all_features += self.embedding(inputs['input_ids']).reshape(len(batch), -1)
                 
         if self.verbose:
-            print(f"Created features from {len(input_sentences)} examples with shape: {out.shape}")
+            print(f"Created features from {len(batch)} examples with shape: {out.shape}")
+        
+        with torch.no_grad():
+            out = torch.cat(all_features).cpu().numpy()
         
         return out
     
