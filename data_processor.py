@@ -9,8 +9,7 @@ def batch_processor(dataset, split, batch_size=0, attributes="weight", dataset_s
     if dataset == "verb":
         return VerbProcessor(attributes, dataset_size, split, batch_size)
     elif dataset == "prost":
-        print(attributes)
-        return ProstProcessor(split, batch_size, )
+        return ProstProcessor(split, batch_size, attributes)
     elif dataset == "doq":
         return DoqProcessor(split)
 
@@ -94,24 +93,18 @@ class VerbProcessor():
         cols = ["obj1", "obj2"]
         cols.append(f"{self.attributes}-agree")
         cols.append(f"{self.attributes}-maj")
-        # for curr_attr in self.attributes:
-        #     cols.append(f"{curr_attr}-agree")
-        #     cols.append(f"{curr_attr}-maj")
         database = database.loc[:, cols]
 
         # remove unlabelled data
         database = database[database[f"{self.attributes}-maj"] != -42]
         # database = database[database[f"{self.attributes}-maj"] != 0] # ambigious questions
         database = database[database[f"{self.attributes}-agree"] != 1]
-        # for curr_attr in self.attributes:
-        #     database = database[database[f"{curr_attr}-maj"] != -42]
         database = database.reset_index()
 
         return database
 
     def check_valid_params(self, attributes, dataset_size, split):
         valid_attributes = ["size", "weight", "strength", "rigidness", "speed"]
-        # if not all(elem in valid_attributes  for elem in attributes):
         if attributes not in valid_attributes:
             print(f"The available attributes are one of {valid_attributes}")
             return False
