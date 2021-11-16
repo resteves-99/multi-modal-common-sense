@@ -83,7 +83,11 @@ class WordModel:
     
     def get_features(self, input_sentences, pooled=False):
         all_features = []
-        for i in tqdm(range(int(len(input_sentences) / 20) + 1)):
+        iters = int(len(input_sentences)/20)
+        if len(input_sentences)%20 != 0:
+            iters += 1
+        # for i in tqdm(range(iters)):
+        for i in range(iters):
             if (i+1)*20 >= len(input_sentences):
                 batch = input_sentences[i*20:]
             else:
@@ -103,9 +107,8 @@ class WordModel:
                 
         if self.verbose:
             print(f"Created features from {len(batch)} examples with shape: {out.shape}")
-        
         with torch.no_grad():
-            out = torch.cat(all_features).cpu().numpy()
+            out = torch.cat(all_features, dim=0).cpu().numpy()
         
         return out
     
