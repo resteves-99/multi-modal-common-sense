@@ -34,8 +34,10 @@ if __name__ == "__main__":
     parser.add_argument('--model', type=str, default="roberta",
                         help='')
     parser.add_argument('--dataset', type=str, default="verb")
-    parser.add_argument('--try_encoder', type=bool, default=True)
-    parser.add_argument('--verbose', type=bool, default=False)
+    parser.add_argument('--try_encoder', dest='try_encoder', action='store_true')
+    parser.set_defaults(try_encoder=False)
+    parser.add_argument('--verbose', dest='verbose', action='store_true')
+    parser.set_defaults(verbose=False)
 
     args = parser.parse_args()
     run(args)
