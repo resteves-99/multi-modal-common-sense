@@ -157,6 +157,6 @@ def run_model(model_name, labels, sentences, test_labels, test_sentences, verbos
     
     # test
     test_features = m.get_features(test_sentences)
-    acc = test_model(lr, test_features, test_labels, verbose=verbose)
+    acc, errors = test_model(lr, test_features, test_labels, verbose=verbose)
     
-    return acc
+    return acc, errors
