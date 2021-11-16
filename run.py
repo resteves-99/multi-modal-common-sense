@@ -7,7 +7,6 @@ def run(args):
     # train data
     train_processor = batch_processor(args.dataset, "train", attributes=args.attributes)
     train_labels, _, train_sentences, _ = train_processor.forward()
-    # print(train_sentences)
 
     # test data
     test_processor = batch_processor(args.dataset, "test", attributes=args.attributes)

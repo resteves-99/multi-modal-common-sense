@@ -83,8 +83,11 @@ class WordModel:
     
     def get_features(self, input_sentences, pooled=False):
         all_features = []
-        for i in tqdm(range(int(len(input_sentences) / 20))):
-            batch = input_sentences[i*20:(i+1)*20]
+        for i in tqdm(range(int(len(input_sentences) / 20) + 1)):
+            if (i+1)*20 >= len(input_sentences):
+                batch = input_sentences[i*20:]
+            else:
+                batch = input_sentences[i*20:(i+1)*20]
             inputs = self.tokenizer(batch, return_tensors="pt", padding='max_length', truncation=True, max_length=20)
             if self.try_encoder:
                 if self.model.base_model_prefix in ['roberta', 'roberta_small', 'visualbert', 'visual_bert', 'uniter', 'clip']:
