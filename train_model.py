@@ -84,15 +84,12 @@ class WordModel:
     def get_features(self, input_sentences, pooled=False):
         all_features = []
         iters = int(len(input_sentences)/20)
-        if len(input_sentences)%20 != 0:
+        if len(input_sentences) % 20 != 0:
             iters += 1
-        # for i in tqdm(range(iters)):
-        for i in range(iters):
-            if (i+1)*20 >= len(input_sentences):
-                batch = input_sentences[i*20:]
-            else:
-                batch = input_sentences[i*20:(i+1)*20]
-            inputs = self.tokenizer(batch, return_tensors="pt", padding='max_length', truncation=True, max_length=20)
+
+        for i in range(iters):  # tqdm
+            batch = input_sentences[i*20:(i+1)*20]
+            inputs = self.tokenizer(batch, return_tensors="pt", padding='max_length', truncation=True, max_length=100)
             if self.try_encoder:
                 if self.model.base_model_prefix in ['roberta', 'roberta_small', 'visualbert', 'visual_bert', 'uniter', 'clip']:
                     encoded = self.model(**inputs)
@@ -101,15 +98,16 @@ class WordModel:
                     raise Exception("Model doesn't have native encoder support, use embeddings")
             else:
                 if pooled:
-                    all_features += self.embedding(inputs['input_ids']).mean(axis=1)
+                    all_features += [self.embedding(inputs['input_ids']).mean(axis=1)]
                 else:
-                    all_features += self.embedding(inputs['input_ids']).reshape(len(batch), -1)
-                
+                    all_features += [self.embedding(inputs['input_ids']).reshape(len(batch), -1)]
+        
+        with torch.no_grad():
+            out = torch.cat(all_features).cpu().numpy()
+        
         if self.verbose:
             print(f"Created features from {len(batch)} examples with shape: {out.shape}")
-        with torch.no_grad():
-            out = torch.cat(all_features, dim=0).cpu().numpy()
-        
+            
         return out
     
 
